@@ -30,7 +30,7 @@ object HelloWorld {
 
     println("-----------------")
 
-    //    创建一个sparkContextala的列表，元素都是字符串类型
+    //    创建一个sparkContext的列表，元素都是字符串类型
     val stringList = Array("Spark is awesome", "Spark is cool")
     //    sparkContext调用 parallelize方法，将列表进行并行化处理。这会返回一个RDD
     val stringRDD = sparkContext.parallelize(stringList)
@@ -44,7 +44,7 @@ object HelloWorld {
     //    还可以将RDD里的每一行都用一个自定义函数（toUpperCase）进行处理
     stringRDD.map(line => toUpperCase(line)).collect().foreach(println)
 
-    println("-----------------")
+    println("======= map(func) ==========")
 
     //    定义一个sparkContextala列表
     val contactData = Array(
@@ -62,6 +62,59 @@ object HelloWorld {
     })
     //    最后收集，并遍历打印
     contactRDD.collect().foreach(println)
+
+    println("----------------")
+
+    //    transform from a collection of Strings to a collection of Integers
+    val stringLenRDD = stringRDD.map(line => line.length)
+    stringLenRDD.collect().foreach(println)
+
+    println("\n======= flatMap(func) ==========\n")
+
+    //    transform lines to words
+    val wordRDD = stringRDD.flatMap(line => line.split(" "))
+    wordRDD.collect().foreach(println)
+
+    /**
+     * stringRDD.map(line => line.split(" ")).collect()
+     * 得到：Array[Array[String]] = Array(Array(Spark, is, awesome), Array(Spark, is, cool))
+     *
+     * stringRDD.flatMap(line => line.split(" ")).collect()
+     * 得到：Array[String] = Array(Spark, is, awesome, Spark, is, cool)
+     *
+     * 顾名思义，flatMap 会将每一行进行扁平化处理，最终只会得到一个数组。而 map 则会得到多个数组
+     */
+
+    println("\n======= filter(func) ==========\n")
+
+    //    按照对应的规则对 RDD 进行过滤
+    val awesomeLineRDD = stringRDD.filter(line => line.contains("awesome"))
+    awesomeLineRDD.collect().foreach(println)
+
+    println("\n======= mapPartitions(func)/mapPartitionsWithIndex(index, func) ==========\n")
+
+    import scala.util.Random
+    val simpleList = Array("One", "Two", "Three", "Four", "Five")
+
+    def addRandomNumber(rows: Iterator[String]) = {
+      val rand = new Random(System.currentTimeMillis() + Random.nextInt())
+      rows.map(line => line + " : " + rand.nextInt())
+    }
+
+    //    扁平化处理，切分为 2 个切片
+    val simpleRDD = sparkContext.parallelize(simpleList, 2)
+    val result = simpleRDD.mapPartitions((rows: Iterator[String]) => addRandomNumber(rows))
+    result.collect().foreach(println)
+
+    println("-----------------")
+
+    val numberRDD = sparkContext.parallelize(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 2)
+    //    ???? 并没有出现分片的序号 ????
+    numberRDD.mapPartitionsWithIndex((idx: Int, itr: Iterator[Int]) => {
+      itr.map(n => (idx, n))
+    })
+    numberRDD.collect().foreach(println)
+
 
 
     //    =======================================
