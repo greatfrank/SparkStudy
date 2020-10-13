@@ -244,6 +244,124 @@ object HelloWorld {
     val pairRDD = rdd.map(w => (w.length, w))
     pairRDD.collect().foreach(println)
 
+    println("\n======= groupByKey([numTasks]) ==========\n")
+    /**
+     * 按照key进行分组
+     * 下面的例子中，w.length 就会作为每一个单词的key。如果某些单词的字母数相同，那么将会分为一组
+     */
+    val rdd2 = sparkContext.parallelize(List("Spark", "is", "an", "amazing", "piece", "of", "technology"))
+    val pairRDD2 = rdd2.map(w => (w.length, w))
+    val wordByLenRDD = pairRDD2.groupByKey()
+    wordByLenRDD.collect().foreach(println)
+
+    println("\n======= reduceByKey(func, [numTasks]) ==========\n")
+    /**
+     * reduceByKey接收一个函数，reduceByKey会根据这个函数，按照相同的key，把对应的value进行处理。
+     */
+
+    val candyTx = sparkContext.parallelize(List(
+      ("candy1", 5.2),
+      ("candy2", 3.5),
+      ("candy1", 2.0),
+      ("candy2", 6.0),
+      ("candy3", 3.0)
+    ))
+    val summaryTx = candyTx.reduceByKey((total, value) => total + value)
+    summaryTx.collect().foreach(println)
+
+    println("\n======= sortByKey([ascending], [numTasks]) ==========\n")
+
+    /**
+     * 顾名思义，根据key进行排序
+     */
+    //      这里通过map重新构建了元祖列表，用元祖的第二个元素作为key，因为这个key是数字，所以方便排序。用元祖的第一个元素作为value。
+    val summaryByPrice = summaryTx.map(t => (t._2, t._1)).sortByKey()
+    summaryByPrice.collect().foreach(println)
+
+    println("-----")
+
+    //    默认是升序排序，如果传递一个false，则是倒序排序
+    val summaryByPrice2 = summaryTx.map(t => (t._2, t._1)).sortByKey(false)
+    summaryByPrice2.collect().foreach(println)
+
+    println("\n======= join(otherRDD) ==========\n")
+
+    /**
+     * 按照相同的key，将两个RDD里对应的value进行组合
+     */
+    val memberTx = sparkContext.parallelize(List(
+      (110, 50.35),
+      (127, 305.2),
+      (126, 211.0),
+      (105, 6.0),
+      (165, 31.0),
+      (110, 40.11))
+    )
+    val memberInfo = sparkContext.parallelize(List(
+      (110, "a"),
+      (127, "b"),
+      (126, "b"),
+      (105, "a"),
+      (165, "c"))
+    )
+    val memberTxInfo = memberTx.join(memberInfo)
+    memberTxInfo.collect().foreach(println)
+
+    //    ==================================================
+    //    ============= key/value pair RDD Actions ==================
+    //    ==================================================
+
+    println("\n======= countByKey() ==========\n")
+
+    /**
+     * 这个方法返回的数据类型是scala的map类型
+     */
+
+    val candyTx2 = sparkContext.parallelize(List(
+      ("candy1", 5.2),
+      ("candy2", 3.5),
+      ("candy1", 2.0),
+      ("candy3", 6.0)
+    ))
+    println(candyTx2.countByKey())
+
+    println("\n======= collectAsMap() ==========\n")
+
+    val candyTx3 = sparkContext.parallelize(List(
+      ("candy1", 5.2),
+      ("candy2", 3.5),
+      ("candy1", 2.0),
+      ("candy3", 6.0)
+    ))
+    //    多个相同key的row将会被收缩为一个唯一的row
+    println(candyTx3.collectAsMap())
+
+    println("\n======= collectAsMap() ==========\n")
+
+    /**
+     * 用于检测某个key是否存在于RDD中
+     */
+    val candyTx4 = sparkContext.parallelize(List(
+      ("candy1", 5.2),
+      ("candy2", 3.5),
+      ("candy1", 2.0),
+      ("candy3", 6.0)
+    ))
+    println(candyTx4.lookup("candy1"))
+    println(candyTx4.lookup("candy2"))
+    println(candyTx4.lookup("candy3"))
+    println(candyTx4.lookup("candy5"))
+
+
+
+
+
+
+
+
+
+
+
 
 
 
