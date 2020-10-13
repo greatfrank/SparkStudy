@@ -115,6 +115,61 @@ object HelloWorld {
     })
     numberRDD.collect().foreach(println)
 
+    println("\n======= union(otherRDD) ==========\n")
+
+    //    合并两个RDD。将一个RDD插入到另外一个RDD中，最终生成一个新的RDD
+    val rdd_1 = sparkContext.parallelize(Array(1, 2, 3, 4, 5))
+    val rdd_2 = sparkContext.parallelize(Array(1, 6, 7, 8))
+    val rdd_3 = rdd_1.union(rdd_2)
+    rdd_3.collect().foreach(println)
+
+    println("\n======= intersection(otherRDD) ==========\n")
+
+    /**
+     * 检查哪些row存在于两个或两个以上的RDD中，把共同存在于两个RDD中的那个row取出来，返回一个新的RDD
+     * 类似于【并集】
+     */
+    val rdd_11 = sparkContext.parallelize(Array("One", "Two", "Three"))
+    val rdd_22 = sparkContext.parallelize(Array("two", "One", "threed", "One"))
+    val rdd_33 = rdd_11.intersection(rdd_22)
+    rdd_33.collect().foreach(println)
+
+    println("\n======= subtract(otherRDD) ==========\n")
+
+    /**
+     * subtract 类似寻找两个RDD中的row之间的差集。
+     */
+    val words = sparkContext.parallelize(List("The amazing thing about spark is that it is very simple to learn")).flatMap(l => l.split(" ")).map(w => w.toLowerCase)
+    val stopWords = sparkContext.parallelize(List("a that this the it is to that")).flatMap(line => line.split(" "))
+    val realWords = words.subtract(stopWords)
+    realWords.collect().foreach(println)
+
+    println("\n======= distinct() ==========\n")
+
+    /**
+     * remove any duplicate rows、它会计算每一个row的哈希码，然后比较这些哈希码，把相同哈希码的row去掉，只留下内容唯一的row
+     */
+    val duplicateValueRDD = sparkContext.parallelize(List("one", 1, "two", 2, "three", "one", "two", 1, 2))
+    duplicateValueRDD.distinct().collect().foreach(println)
+
+    println("\n======= sample(withReplacement, fraction, seed) ==========\n")
+
+    /**
+     * sample用于从全集中抽取一部分。
+     * withReplacement：表示抽出样本后是否放回去。类型为Boolean。如果值为true，则抽取后还会放回去。那么这样意味着抽出的样本可能会有重复
+     * fraction：double类型，值在0-1之间，0.3表示抽出30%
+     * seed：表示一个种子，根据这个seed随机抽取，一般不设定，用默认的就可以。这个参数一般用于调试，可以将这个参数设定为定值
+     */
+    val numbers = sparkContext.parallelize(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 2)
+    numbers.sample(true, 0.3).collect().foreach(println)
+    println("----")
+    numbers.sample(false, 0.4).collect().foreach(println)
+
+    //    =================================================
+    //    ========== Actions ==============================
+    //    =================================================
+
+
 
 
     //    =======================================
