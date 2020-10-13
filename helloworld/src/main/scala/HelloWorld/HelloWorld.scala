@@ -45,7 +45,6 @@ object HelloWorld {
     stringRDD.map(line => toUpperCase(line)).collect().foreach(println)
 
     println("======= map(func) ==========")
-
     //    定义一个sparkContextala列表
     val contactData = Array(
       "1#John Doe#jdoe@domain.com",
@@ -70,7 +69,6 @@ object HelloWorld {
     stringLenRDD.collect().foreach(println)
 
     println("\n======= flatMap(func) ==========\n")
-
     //    transform lines to words
     val wordRDD = stringRDD.flatMap(line => line.split(" "))
     wordRDD.collect().foreach(println)
@@ -86,13 +84,11 @@ object HelloWorld {
      */
 
     println("\n======= filter(func) ==========\n")
-
     //    按照对应的规则对 RDD 进行过滤
     val awesomeLineRDD = stringRDD.filter(line => line.contains("awesome"))
     awesomeLineRDD.collect().foreach(println)
 
     println("\n======= mapPartitions(func)/mapPartitionsWithIndex(index, func) ==========\n")
-
     import scala.util.Random
     val simpleList = Array("One", "Two", "Three", "Four", "Five")
 
@@ -116,7 +112,6 @@ object HelloWorld {
     numberRDD.collect().foreach(println)
 
     println("\n======= union(otherRDD) ==========\n")
-
     //    合并两个RDD。将一个RDD插入到另外一个RDD中，最终生成一个新的RDD
     val rdd_1 = sparkContext.parallelize(Array(1, 2, 3, 4, 5))
     val rdd_2 = sparkContext.parallelize(Array(1, 6, 7, 8))
@@ -124,7 +119,6 @@ object HelloWorld {
     rdd_3.collect().foreach(println)
 
     println("\n======= intersection(otherRDD) ==========\n")
-
     /**
      * 检查哪些row存在于两个或两个以上的RDD中，把共同存在于两个RDD中的那个row取出来，返回一个新的RDD
      * 类似于【并集】
@@ -135,7 +129,6 @@ object HelloWorld {
     rdd_33.collect().foreach(println)
 
     println("\n======= subtract(otherRDD) ==========\n")
-
     /**
      * subtract 类似寻找两个RDD中的row之间的差集。
      */
@@ -145,7 +138,6 @@ object HelloWorld {
     realWords.collect().foreach(println)
 
     println("\n======= distinct() ==========\n")
-
     /**
      * remove any duplicate rows、它会计算每一个row的哈希码，然后比较这些哈希码，把相同哈希码的row去掉，只留下内容唯一的row
      */
@@ -153,7 +145,6 @@ object HelloWorld {
     duplicateValueRDD.distinct().collect().foreach(println)
 
     println("\n======= sample(withReplacement, fraction, seed) ==========\n")
-
     /**
      * sample用于从全集中抽取一部分。
      * withReplacement：表示抽出样本后是否放回去。类型为Boolean。如果值为true，则抽取后还会放回去。那么这样意味着抽出的样本可能会有重复
@@ -169,7 +160,77 @@ object HelloWorld {
     //    ========== Actions ==============================
     //    =================================================
 
+    println("\n======= collect() ==========\n")
+    /**
+     * 从每一个部分集合所有的row，然后把汇集到的row提交给其他程序进行处理
+     * 但是如果你的row非常多，比如上百万个，那么这种方式就可能会出现内存溢出的错误，因为数据一下子有太多的数据放入了内从中。
+     */
+    val numbersRDD = sparkContext.parallelize(List(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 2)
+    numbersRDD.collect().foreach(println)
 
+    println("\n======= count() ==========\n")
+
+    /**
+     * 顾名思义，它会统计row的个数，返回一个整数
+     */
+    println(numbersRDD.count())
+
+    println("\n======= first() ==========\n")
+
+    /**
+     * 得到RDD中的第一个row。这里的“第一”表示在第一个partition中的。
+     * 注意：如果你的RDD是空的，那么运行这个方法会报错
+     */
+    println(numbersRDD.first())
+
+
+    println("\n======= take(n) ==========\n")
+
+    /**
+     * 返回在第一个partition中的RDD里的前 n 个row
+     * take(1) 等同于 first()
+     */
+    numbersRDD.take(6).foreach(println)
+
+
+    println("\n======= reduce(func) ==========\n")
+
+    /**
+     * 给reduce里传递一个函数。这里以求和为例。作用就是将RDD里的所有row的值累加起来
+     */
+    def add(v1: Int, v2: Int): Int = {
+      println(s"v1: $v1, v2: $v2 => (${v1 + v2})")
+      v1 + v2
+    }
+
+    numbersRDD.reduce(add)
+
+    println("\n======= takeSample(withReplacement, n, [seed]) ==========\n")
+
+    /**
+     * 这个方法的作用于sample transformation 的作用类似，不同的是这个方法会返回一个含有row的列表
+     */
+
+    println("\n======= takeOrdered(n, [ordering]) ==========\n")
+
+    /**
+     * 这个action会返回具有一定次序的 n 个 rows
+     */
+
+    numbersRDD.takeOrdered(4).foreach(println)
+    println("----")
+    numbersRDD.takeOrdered(4)(Ordering[Int].reverse).foreach(println)
+
+    println("\n======= top(n, [ordering]) ==========\n")
+
+    /**
+     * 获取RDD中的前n个值最大的row
+     */
+    numbersRDD.top(5).foreach(println)
+
+    println("\n======= saveAsTextFile(path) ==========\n")
+
+    
 
 
     //    =======================================
