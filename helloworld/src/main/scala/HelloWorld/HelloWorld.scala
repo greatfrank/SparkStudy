@@ -230,7 +230,21 @@ object HelloWorld {
 
     println("\n======= saveAsTextFile(path) ==========\n")
 
-    
+    //    =====================================================
+    //    ============== Key/Value Pair RDD ===================
+    //    =====================================================
+
+    println("\n======= creating key/value pair RDD ==========\n")
+
+    /**
+     * key/value 可以是简单的scala数据类型，也可以是复杂的值，比如object，collection of objects，或者是tuple。
+     */
+
+    val rdd = sparkContext.parallelize(List("Spark", "is", "an", "amazing", "piece", "of", "technology"))
+    val pairRDD = rdd.map(w => (w.length, w))
+    pairRDD.collect().foreach(println)
+
+
 
 
     //    =======================================
