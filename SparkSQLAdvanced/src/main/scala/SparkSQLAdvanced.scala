@@ -323,15 +323,167 @@ object SparkSQLAdvanced {
     //    using SQL
     spark.sql("select /*+ MAPJOIN(departments) */ * from employees JOIN departments on dept_no == id").explain()
 
+    doubleLine("Working with Build-in Functions")
+
+    line("Date-TIme Functions")
+
+    val testDateTSDF = Seq(
+      (1, "2018-01-01", "2018-01-01 15:04:58:865", "01-01-2018", "12-05-2017 45:50")
+    ).toDF("id", "date", "timestamp", "date_str", "ts_str")
+
+    //    convert these strings into date, timestamp and unix timestamp and specify a custom date and timestamp format
+    val testDateResultDF = testDateTSDF.select(
+      to_date('date).as("date1"),
+      to_timestamp('timestamp).as("ts1"),
+      to_date('date_str, "MM-dd-yyyy").as("date2"),
+      to_timestamp('ts_str, "MM-dd-yyyy mm:ss").as("ts2"),
+      unix_timestamp('timestamp).as("unix_ts")
+    )
+
+    testDateResultDF.printSchema()
+    testDateResultDF.show()
+
+    line("Convert a Date, Timestamp, Unix Timestamp to a String")
+
+    testDateResultDF.select(
+      date_format('date1, "dd-MM-YYYY").as("date_str"),
+      date_format('ts1, "dd-MM-YYYY HH:mm:ss").as("ts_str"),
+      from_unixtime('unix_ts, "dd-MM-YYYY HH:mm:ss").as("unix_ts_str")
+    ).show(false)
+
+    line("Date-time Calculation 日期时间的计算")
+
+    //    构建DataFrame
+    val employeeData = Seq(
+      ("John", "2016-01-01", "2017-10-15"),
+      ("May", "2017-02-06", "2017-12-25")
+    ).toDF("name", "join_date", "leave_date")
+
+    employeeData.show()
+
+    //    计算日期和月份
+    line("计算日期和月份")
+
+    employeeData.select(
+      'name,
+      datediff('leave_date, 'join_date).as("days 从入职到离职的天数"),
+      months_between('leave_date, 'join_date).as("months 从入职到离职的月份"),
+      last_day('leave_date).as("last_day_of_month 本月的最后一天的日期")
+    ).show(false)
+
+    //    运行日期的加法和减法
+    val oneDate = Seq(("2018-01-01")).toDF("new_year")
+
+    oneDate.select(
+      //      日期加上14天
+      date_add('new_year, 14).as("mid_month"),
+      //      日期减去 1 天
+      date_sub('new_year, 1).as("new_year_eve"),
+      //      当前日期到下一个周一是几月几日
+      next_day('new_year, "Mon").as("next_mon")
+    ).show(false)
+
+    val valentimeDateDF = Seq(("2018-02-14 05:35:55")).toDF("date")
+    valentimeDateDF.select(
+      year('date).as("year"),
+      quarter('date).as("quarter 季度"),
+      month('date).as("month"),
+      weekofyear('date).as("woy 当年的第几周"),
+      dayofmonth('date).as("dom 当月的第几天"),
+      hour('date).as("hour"),
+      minute('date).as("minute"),
+      second('date).as("second")
+    ).show(false)
+
+    doubleLine("Work with String Functions")
+
+    val sparkDF = Seq(("   Spark   ")).toDF("name")
+
+    line("trim 去掉字符串边上的空格")
+
+    //    trimming 修边
+    sparkDF.select(
+      //      去掉字符串左右两边的空格
+      trim('name).as("trim"),
+      //      去掉字符串左边的空格
+      ltrim('name).as("ltrim"),
+      //      去掉字符串右边的空格
+      rtrim('name).as("rtrim")
+    ).show(false)
+
+    line("向左边或者右边插入指定个数的字符串")
+
+    sparkDF.select(
+      //      去掉左右的空格
+      trim('name).as("trim")
+    )
+      .select(
+        //        向左边插入8个【-】
+        lpad('trim, 8, "-").as("lpad"),
+        //        向右边插入8个【=】
+        rpad('trim, 8, "=").as("rpad"),
+      )
+      .show()
+
+    line("对字符串进行 大写，小写，拼接，倒序 的处理")
+
+    val sparkAwesomeDF = Seq(("Spark", "is", "awesome")).toDF("subject", "verb", "adj")
+    sparkAwesomeDF.select(concat_ws(" ", 'subject, 'verb, 'adj).as("sentence"))
+      .select(
+        lower('sentence).as("lower"),
+        upper('sentence).as("upper"),
+        //        句子中的每一个单词第一个字母大写
+        initcap('sentence).as("initcap"),
+        reverse('sentence).as("reverse")
+      ).show()
+
+    line("transform from one character to another")
+    //    把单词【Spark】里的【ar】替换为【oc】
+    sparkAwesomeDF.select('subject, translate('subject, "ar", "oc")).show()
+
+    line("使用 regexp_extract 函数来提取 【fox】 利用正则表达式")
+
+    val rhymeDF = Seq(("A fox saw a crow sitting on a tree singing \"Caw! Caw! Caw!\"")).toDF("rhyme")
+
+    //    regexp_extract 利用正则表达式从字符串中提取一段单词
+    rhymeDF.select(regexp_extract('rhyme, "[a-z]*o[xw]", 0).as("substring")).show()
+
+    //    用正则表达式将字符串中的一段字母替换掉
+    rhymeDF.select(regexp_replace('rhyme, "fox|crow", "animal").as("new_rhyme")).show(false)
+    //    和上面是同样的结果
+    rhymeDF.select(regexp_replace('rhyme, "[a-z]*o[xw]", "animal").as("new_rhyme")).show(false)
+
+    doubleLine("Work with Math Function 四舍五入")
+
+    val numberDF = Seq((3.14)).toDF("pie")
+    numberDF.select(
+      round('pie).as("原始数据"),
+      round('pie, 1).as("保留一位小数"),
+      round('pie, 2).as("保留两位小数")
+    ).show(false)
+
+    
+
+
+
+
     //    ==============================================
   }
 
   def line(title: String = ""): Unit = {
-    println(s"\n-------------${title}---------------------\n")
+    if (title == "") {
+      println("\n-------------------------------------------\n")
+    } else {
+      println(s"\n------------- ${title} ---------------------\n")
+    }
   }
 
   def doubleLine(title: String = ""): Unit = {
-    println(s"\n===========${title}============\n")
+    if (title == "") {
+      println("\n=====================================\n")
+    } else {
+      println(s"\n=========== ${title} ============\n")
+    }
   }
 
   case class Student(name: String, gender: String, weight: Long, graduation_year: Long)
