@@ -462,8 +462,250 @@ object SparkSQLAdvanced {
       round('pie, 2).as("保留两位小数")
     ).show(false)
 
-    
+    doubleLine("Work with Collection Functions")
 
+    val tasksDF = Seq(
+      ("Monday", Array("Pick Up John", "Buy Milk", "Pay Bill"))
+    ).toDF("day", "tasks")
+
+    tasksDF.printSchema()
+
+    //    获取列表的元素个数，排序，查看某些单词是否存在于列表中
+    tasksDF.select(
+      'day,
+      size('tasks).as("size"),
+      sort_array('tasks).as("sorted_tasks"),
+      array_contains('tasks, "Pay Bill").as("shouldPayBill")
+    ).show(false)
+
+    //    explode 函数将会针对列表中的每一个元素创建一个新的行
+    tasksDF.select('day, explode('tasks)).show(false)
+
+    line("create a string that contains JSON string")
+
+    //    经过测试，把json字符串都放在一行，正常运行；如果把这些字符串排列在多行，下面的转换会得到null的结果
+    val todos = """{"day":"Monday","tasks":["Pick Up John","Buy Milk","Pay Bill"]}"""
+    //        用上面的json形式的字符串生成一个DataFrame
+    val todoStrDF = Seq((todos)).toDF("todos_str")
+
+    //    todoStrDF is DataFrame with one column of string type
+    todoStrDF.printSchema()
+
+    line("Convert a JSON string into a Spark struct data type")
+
+    //    这里定义一个json的结构，每一个key的数据类型是字符串，对应的value的数据类型由add方法的第二个参数定义
+    val todoSchema = new StructType().add("day", StringType).add("tasks", ArrayType(StringType))
+
+    //    使用 from_json 来转换 JSON 字符串。这里用的是别名 todos_str
+    val todosDF = todoStrDF.select(from_json('todos_str, todoSchema).as("todos"))
+
+    todosDF.printSchema()
+
+    todosDF.select(
+      'todos.getItem("day"),
+      'todos.getItem("tasks"),
+      'todos.getItem("tasks").getItem(0).as("first_task")
+    ).show(false)
+
+    line("Convert a Spark struct data type to JSON string")
+
+    todosDF.select(to_json('todos)).show(false)
+
+    doubleLine("混杂函数")
+
+    line("单调递增")
+
+    /**
+     * range 函数会生成一个数据范围
+     * 第一个参数：起始数字
+     * 第二个参数：结束的数字
+     * 第三个参数：数字的间隔
+     * 第四个参数：分区，类似于分布式
+     */
+    val numDF = spark.range(1, 11, 1, 5)
+    numDF.show(false)
+
+    /**
+     * +---+
+     * |id |
+     * +---+
+     * |1  |
+     * |2  |
+     * |3  |
+     * |4  |
+     * |5  |
+     * |6  |
+     * |7  |
+     * |8  |
+     * |9  |
+     * |10 |
+     * +---+
+     */
+
+    //    查看数字范围的分区
+    println(numDF.rdd.getNumPartitions)
+
+    numDF.select(
+      'id,
+      //      单调递增
+      monotonically_increasing_id().as("m_ii"),
+      //      spark的分区编号
+      spark_partition_id().as("partition")
+    ).show(false)
+
+    /**
+     * +---+-----------+---------+
+     * |id |m_ii       |partition|
+     * +---+-----------+---------+
+     * |1  |0          |0        |
+     * |2  |1          |0        |
+     * |3  |8589934592 |1        |
+     * |4  |8589934593 |1        |
+     * |5  |17179869184|2        |
+     * |6  |17179869185|2        |
+     * |7  |25769803776|3        |
+     * |8  |25769803777|3        |
+     * |9  |34359738368|4        |
+     * |10 |34359738369|4        |
+     * +---+-----------+---------+
+     */
+
+    doubleLine("用 when 函数将 数字类型的值转换为字符串")
+
+    //    用7个数字代表一周的每一天
+    val dayOfWeekDF = spark.range(1, 8, 1)
+
+    //    将数字转换为字符串
+    dayOfWeekDF.select(
+      'id,
+      when('id === 1, "Mon")
+        .when('id === 2, "Tue")
+        .when('id === 3, "Wed")
+        .when('id === 4, "Thu")
+        .when('id === 5, "Fri")
+        .when('id === 6, "Sat")
+        .when('id === 7, "Sun").as("dow")
+    ).show(false)
+
+    /**
+     * +---+---+
+     * |id |dow|
+     * +---+---+
+     * |1  |Mon|
+     * |2  |Tue|
+     * |3  |Wed|
+     * |4  |Thu|
+     * |5  |Fri|
+     * |6  |Sat|
+     * |7  |Sun|
+     * +---+---+
+     */
+
+
+    dayOfWeekDF.select(
+      'id,
+      when('id === 6, "Weekend")
+        .when('id === 7, "Weekend")
+        .otherwise("Weekday").as("day_type")
+    ).show(false)
+
+    /**
+     * +---+--------+
+     * |id |day_type|
+     * +---+--------+
+     * |1  |Weekday |
+     * |2  |Weekday |
+     * |3  |Weekday |
+     * |4  |Weekday |
+     * |5  |Weekday |
+     * |6  |Weekend |
+     * |7  |Weekend |
+     * +---+--------+
+     */
+
+    line("用 coalesce 函数处理列中的null值")
+
+    val badMoviesDF2 = Seq(
+      Movie(null, null, 2018L),
+      Movie("John Doe", "Awesome Movie", 2018L)
+    ).toDF()
+
+    badMoviesDF2.show(false)
+
+    //    检查actor_name这一列里是否有null，如果有，则用后面lit函数里的no_name字符串来替换null。
+    //      coalesce函数，第一个参数是查询的列的名称，第二个参数lit函数里是要将null替换为什么字符串
+    badMoviesDF2.select(coalesce('actor_name, lit("no_name")).as("new name")).show(false)
+
+    doubleLine("用户自定义函数")
+
+    val studentDF = Seq(
+      Student2("Joe", 85),
+      Student2("Jane", 90),
+      Student2("Mary", 55)
+    ).toDF()
+
+    studentDF.show(false)
+
+    /**
+     * +----+-----+
+     * |name|score|
+     * +----+-----+
+     * |Joe |85   |
+     * |Jane|90   |
+     * |Mary|55   |
+     * +----+-----+
+     */
+
+    //    register as a view，注册一个表，为的是后面使用SQL
+    studentDF.createOrReplaceTempView("students")
+
+    //    用户自定义函数：把成绩的数字转换为档次
+    def letterGrade(score: Int) = {
+      score match {
+        case score if score > 100 => "Cheating"
+        case score if score >= 90 => "A"
+        case score if score >= 80 => "B"
+        case score if score >= 70 => "C"
+        case _ => "F"
+      }
+    }
+
+    //    把自定义函数注册为UDF  user defined function
+    val letterGradeUDF = udf(letterGrade(_: Int): String)
+
+    //    用 UDF 将成绩转换为字符串
+    studentDF.select($"name", $"score", letterGradeUDF($"score").as("grade")).show(false)
+
+    /**
+     * +----+-----+-----+
+     * |name|score|grade|
+     * +----+-----+-----+
+     * |Joe |85   |B    |
+     * |Jane|90   |A    |
+     * |Mary|55   |F    |
+     * +----+-----+-----+
+     */
+
+    line("用SQL来调用UDF函数")
+
+    spark.sqlContext.udf.register("letterGrade", letterGrade(_: Int): String)
+    spark.sql("select name, score, letterGrade(score) as grade from students").show(false)
+
+    /**
+     * +----+-----+-----+
+     * |name|score|grade|
+     * +----+-----+-----+
+     * |Joe |85   |B    |
+     * |Jane|90   |A    |
+     * |Mary|55   |F    |
+     * +----+-----+-----+
+     */
+
+//    ========================================
+//    =============== 高级分析函数 =============
+//    ========================================
+
+    doubleLine("高级分析函数")
 
 
 
@@ -491,5 +733,9 @@ object SparkSQLAdvanced {
   case class Employee(first_name: String, dept_no: Long)
 
   case class Dept(id: Long, name: String)
+
+  case class Movie(actor_name: String, movie_title: String, produced_year: Long)
+
+  case class Student2(name: String, score: Int)
 
 }
