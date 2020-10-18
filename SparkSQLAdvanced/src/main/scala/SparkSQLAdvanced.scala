@@ -3,6 +3,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.expressions._
 
 
 object SparkSQLAdvanced {
@@ -701,11 +702,191 @@ object SparkSQLAdvanced {
      * +----+-----+-----+
      */
 
-//    ========================================
-//    =============== 高级分析函数 =============
-//    ========================================
+    //    ========================================
+    //    =============== 高级分析函数 =============
+    //    ========================================
 
     doubleLine("高级分析函数")
+
+    line("rollup 聚合")
+
+    /**
+     * 可以根据部分列的数据进行归纳
+     */
+
+    //      通过where提供的条件，过滤出合格的row
+    val twoStatesSummary = flight_summaryDF.select('origin_state, 'origin_city, 'count)
+      .where('origin_state === "CA" || 'origin_state === "NY")
+      .where('count > 1 && 'count < 20)
+      .where('origin_city =!= "White Plains")
+      .where('origin_city =!= "Newburgh")
+      .where('origin_city =!= "Mammoth Lakes")
+      .where('origin_city =!= "Ontario")
+
+    twoStatesSummary.show(false)
+
+    /**
+     * +------------+-------------+-----+
+     * |origin_state|origin_city  |count|
+     * +------------+-------------+-----+
+     * |NY          |New York     |4    |
+     * |NY          |Elmira       |15   |
+     * |CA          |San Diego    |18   |
+     * |CA          |San Francisco|14   |
+     * |NY          |New York     |2    |
+     * |NY          |Albany       |5    |
+     * |CA          |San Francisco|2    |
+     * |NY          |Albany       |3    |
+     * |NY          |Albany       |9    |
+     * |NY          |New York     |4    |
+     * |CA          |San Francisco|5    |
+     * |CA          |San Diego    |4    |
+     * |NY          |New York     |10   |
+     * +------------+-------------+-----+
+     */
+
+    //    然后再利用rollup进行计算和归纳
+    /**
+     * 假设有个 3 列的数据要统计
+     * rollup 会返回【column 1】、【column 1，column 2】,【column 1，column 2，column 3】的组合统计
+     */
+    twoStatesSummary.rollup('origin_state, 'origin_city)
+      .agg(sum("count").as("total"))
+      .orderBy('origin_state.asc_nulls_last, 'origin_city.asc_nulls_last)
+      .show(false)
+
+    /**
+     * +------------+-------------+-----+
+     * |origin_state|origin_city  |total|
+     * +------------+-------------+-----+
+     * |CA          |San Diego    |22   |
+     * |CA          |San Francisco|21   |
+     * |CA          |null         |43   |
+     * |NY          |Albany       |17   |
+     * |NY          |Elmira       |15   |
+     * |NY          |New York     |20   |
+     * |NY          |null         |52   |
+     * |null        |null         |95   |
+     * +------------+-------------+-----+
+     */
+
+    line("Cube")
+
+    /**
+     * 假设有个 3 列的数据要统计
+     * rollup 会返回【column 1】、【column 2】，【column 3】，【column 1，column 2】,【column 1，column 3】，【column 2， column 3】的组合统计
+     */
+
+    twoStatesSummary.cube('origin_state, 'origin_city)
+      .agg(sum("count").as("total"))
+      .orderBy('origin_state.asc_nulls_last, 'origin_city.asc_nulls_last)
+      .show(false)
+
+    /**
+     * +------------+-------------+-----+
+     * |origin_state|origin_city  |total|
+     * +------------+-------------+-----+
+     * |CA          |San Diego    |22   |
+     * |CA          |San Francisco|21   |
+     * |CA          |null         |43   |
+     * |NY          |Albany       |17   |
+     * |NY          |Elmira       |15   |
+     * |NY          |New York     |20   |
+     * |NY          |null         |52   |
+     * |null        |Albany       |17   |
+     * |null        |Elmira       |15   |
+     * |null        |New York     |20   |
+     * |null        |San Diego    |22   |
+     * |null        |San Francisco|21   |
+     * |null        |null         |95   |
+     * +------------+-------------+-----+
+     */
+
+    doubleLine("TIme Windows")
+
+    val appleOneYearDF = spark.read.format("csv").option("header", "true").option("inferSchema", "true").load("src/main/scala/data/stocks/aapl-2017.csv")
+    appleOneYearDF.printSchema()
+
+    line("利用 window 函数计算分组后的一周内的平均股价")
+
+    val appleWeeklyAvgDF = appleOneYearDF.groupBy(window('Date, "1 week")).agg(avg("Close").as("weekly_avg"))
+    appleWeeklyAvgDF.printSchema()
+
+    //    display the result with ordering by start time and round up to 2 decimal points
+    appleWeeklyAvgDF.orderBy("window.start")
+      .selectExpr("window.start", "window.end", "round(weekly_avg, 2) as weekly_avg").show(5)
+
+    //    四周的时间窗口，以一周为单位，窗口滑动
+    val appleMonthlyAvgDF = appleOneYearDF.groupBy(window('Date, "4 week", "1 week")).agg(avg("Close").as("monthly_avg"))
+    appleMonthlyAvgDF.orderBy("window.start").selectExpr("window.start", "window.end", "round(monthly_avg, 2) as monthly_avg").show(5)
+
+    doubleLine("Window Functions")
+
+    val txDataDF = Seq(
+      ("John", "2017-07-02", 13.35),
+      ("John", "2017-07-06", 27.33),
+      ("John", "2017-07-04", 21.72),
+      ("Mary", "2017-07-07", 69.74),
+      ("Mary", "2017-07-01", 59.44),
+      ("Mary", "2017-07-05", 80.14)
+    ).toDF("name", "tx_date", "amount")
+
+    val forRankingWindow = Window.partitionBy("name").orderBy(desc("amount"))
+
+    //    给 txDataDF 添加一个新的列用来保存每一行的等级信息。这里需要用 rank 函数来实现等级的计算
+    val txDataWithRankDF = txDataDF.withColumn("rank", rank().over(forRankingWindow))
+
+    //    通过rank来过滤每一行，找出前两个rank的信息
+    txDataWithRankDF.where('rank < 3).show()
+
+    line("max function")
+
+    //    用 rangeBetween来定义frame的分解，每一个frame包含满足frame的所有行
+    val forEntireRangeWindow = Window.partitionBy("name").orderBy(desc("amount")).rangeBetween(Window.unboundedPreceding, Window.unboundedFollowing)
+
+
+    //    遍历amount列，然后计算最大值与每一个amount值的差，得到一个单独的列。
+    val amountDifference = max(txDataDF("amount")).over(forEntireRangeWindow) - txDataDF("amount")
+
+    //    添加一个amount_diff列
+    val txDiffWithHighestDF = txDataDF.withColumn("amount_diff", round(amountDifference, 3))
+
+    txDiffWithHighestDF.show()
+
+    line()
+
+    val forMovingAvgWindow = Window.partitionBy("name").orderBy("tx_date").rowsBetween(Window.currentRow - 1, Window.currentRow + 1)
+    val txMoviingAvgDF = txDataDF.withColumn("moving_avg", round(avg("amount").over(forMovingAvgWindow), 2))
+    txMoviingAvgDF.show(false)
+
+    line()
+
+    val forCumulativeSumWindow = Window.partitionBy("name").orderBy("tx_date").rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val txCumulativeSumDF = txDataDF.withColumn("culm_sum", round(sum("amount").over(forCumulativeSumWindow), 2))
+    txCumulativeSumDF.show(false)
+
+    line("在SQL中使用Window函数")
+
+    txDataDF.createOrReplaceTempView("tx_data")
+    spark.sql("select name, tx_date, amount, rank from (select name, tx_date, amount, RANK() OVER (PARTITION BY name ORDER BY amount DESC) as rank from tx_data) where rank < 3").show(false)
+
+    spark.sql("select name, tx_date, amount, round((max_amount - amount), 2) as amount_diff from (select name, tx_date, amount, MAX(amount) OVER (PARTITION BY name ORDER BY amount DESC RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) as max_amount from tx_data)").show(false)
+
+    spark.sql("select name, tx_date, amount, round(moving_avg, 2) as moving_avg from (select name, tx_date, amount, AVG(amount) OVER (PARTITION BY name ORDER BY tx_date ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) as moving_avg from tx_data)").show(false)
+
+    spark.sql("select name, tx_date, amount, round(culm_sum, 2) as moving_avg from (select name, tx_date, amount, SUM(amount) OVER (PARTITION BY name ORDER BY tx_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as culm_sum from tx_data)").show(false)
+
+    doubleLine("使用 explain 函数来创建逻辑和物理计划")
+
+    val moviesDF = spark.read.load("src/main/scala/data/movies.parquet")
+    val newMoviesDF = moviesDF.filter('produced_year > 1970).withColumn("produced_decade", 'produced_year + 'produced_year % 10).select('movie_title, 'produced_decade).where('produced_decade > 2010)
+    newMoviesDF.explain(true)
+
+    line()
+
+    spark.range(1000).filter("id > 100").selectExpr("sum(id)").explain()
+
+
 
 
 
