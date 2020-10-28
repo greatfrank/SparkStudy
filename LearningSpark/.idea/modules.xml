@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/LearningSpark.iml" filepath="$PROJECT_DIR$/.idea/modules/LearningSpark.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/LearningSpark-build.iml" filepath="$PROJECT_DIR$/.idea/modules/LearningSpark-build.iml" />
+    </modules>
+  </component>
+</project>
